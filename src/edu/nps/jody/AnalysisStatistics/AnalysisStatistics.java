@@ -71,7 +71,7 @@ public class AnalysisStatistics
 			{
 				authorString = stringTokenizer.nextToken();
 				
-				authorInteger = Integer.getInteger(authorString);
+				authorInteger = Integer.parseInt(authorString);
 				
 				sortedSet.add(authorInteger);
 			}
@@ -165,10 +165,10 @@ public class AnalysisStatistics
 				
 				elements = token.split(":");
 				
-				if (Integer.getInteger(elements[1]) > largest[1])
+				if (Integer.parseInt(elements[1]) > largest[1])
 				{
-					largest[0] = Integer.getInteger(elements[0]);
-					largest[1] = Integer.getInteger(elements[1]);
+					largest[0] = Integer.parseInt(elements[0]);
+					largest[1] = Integer.parseInt(elements[1]);
 				}
 			}
 		}
@@ -182,9 +182,10 @@ public class AnalysisStatistics
 		StringTokenizer tokenizer = new StringTokenizer(totalLine);
 		
 		//Dummy check that this is the right line
-		if (tokenizer.countTokens() == 2 && tokenizer.nextToken().equalsIgnoreCase(TOTAL_TAG))
+		if (tokenizer.nextToken().equalsIgnoreCase(TOTAL_TAG) && tokenizer.hasMoreTokens())
 		{
-			total = Integer.getInteger(tokenizer.nextToken());
+			//total = Integer.parseInt(tokenizer.nextToken());
+			total = Integer.parseInt(tokenizer.nextToken());
 		}
 		
 		return total;
@@ -198,14 +199,14 @@ public class AnalysisStatistics
 		
 		int truePositive = confusionArray[author][author];
 		
-		int falsePositive = 0;
+		int falsePositiveTruePositive = 0;
 		
-		for (int i = 0; i < confusionArray.length; i++)
+		for (int i = 0; i < confusionArray[0].length; i++)
 		{
-			falsePositive += confusionArray[i][author];
+			falsePositiveTruePositive += confusionArray[i][author];
 		}
 		
-		precision = ((double) truePositive ) / ( (double) truePositive + (double) falsePositive );
+		precision = ((double) truePositive ) / ( (double) falsePositiveTruePositive );
 		
 		return precision;
 	}
@@ -218,14 +219,14 @@ public class AnalysisStatistics
 		
 		int truePositive = confusionArray[author][author];
 		
-		int falseNegative = 0;
+		int falseNegativeTruePositive = 0;
 		
-		for (int i = 0; i < confusionArray.length; i++)
+		for (int i = 0; i < confusionArray[0].length; i++)
 		{
-			falseNegative += confusionArray[author][i];
+			falseNegativeTruePositive += confusionArray[author][i];
 		}
 		
-		recall = ((double) truePositive ) / ( (double) truePositive + (double) falseNegative );
+		recall = ((double) truePositive ) / ( (double) falseNegativeTruePositive );
 		
 		return recall;
 	}
@@ -266,6 +267,24 @@ public class AnalysisStatistics
 		return mle;
 	}
 	
+	public static double getAccuracy(int[][] confusionArray, String totalUtterances)
+	{
+		double accuracy = 0.0;
+		
+		int truePositives = 0;
+		
+		int total = findTotalUtterances(totalUtterances);
+		
+		for (int i = 0; i < confusionArray[0].length; i++)
+		{
+			truePositives += confusionArray[i][i];
+		}
+		
+		accuracy = ( (double) truePositives ) / ((double ) total );
+		
+		return accuracy;
+	}
+	
 	public static String[] loadStrings(File file) throws FileNotFoundException, IOException
 	{
 		String [] data = new String[LINE_MAX];
@@ -296,13 +315,66 @@ public class AnalysisStatistics
 		
 		return data;
 	}
-	/**
-	 * @param args
-	 */
-	public static void main(String[] args) 
+	
+	public static void processFile(File file) throws FileNotFoundException, IOException
+	{
+		//File			file = null;
+		String[] 	strings;
+		HashMap<Integer, Integer> authorMap;
+		int 			authorIndex = 0;
+		int			authorID;
+		int[][] 	confusionArray;
+		double 	mle;
+		double accuracy;
+		double 	recall;
+		double 	precision;
+		double 	fScore;
+		
+		strings 					= loadStrings(file);
+		authorMap 			= makeAuthorMap(strings[AUTHOR_INDEX]);
+		confusionArray 	= loadConfusionArray(strings[CONFUSION_LINE_INDEX], authorMap);
+		accuracy				= getAccuracy(confusionArray, strings[TOTAL_INDEX]);
+		mle							= getMLE(strings[TRUTH_INDEX],strings[TOTAL_INDEX]);
+
+
+		
+		System.out.println(
+				"MLE: " 			+ mle 				+ "\n"	+
+				"Accuracy: "	+ accuracy	+ "\n");
+				
+		SortedSet<Integer> authorSet = new TreeSet<Integer>(authorMap.keySet());
+		Iterator<Integer> iterator = authorSet.iterator();
+		
+		while (iterator.hasNext())
+		{
+			authorID = iterator.next();
+			authorIndex =authorMap.get(authorID);
+			
+			recall						= getRecall(confusionArray, authorIndex);
+			precision				= getPrecision(confusionArray, authorIndex);
+			fScore 					= getFscore(confusionArray, authorIndex);
+			
+			System.out.println();
+			System.out.println(
+					"Author:\t"			+ authorID		+ "\n" +
+					"Recall:\t" 			+ recall 			+ "\n"	+
+					"Precision:\t" 	+ precision 	+ "\n"	+
+					"F-Score:\t" 		+ fScore);
+		}
+	}
+	
+	public static void processFiles(File[] fileArray)
 	{
 		
-
 	}
-
+	
+	/**
+	 * @param args
+	 * @throws IOException 
+	 * @throws FileNotFoundException 
+	 */
+	public static void main(String[] args) throws FileNotFoundException, IOException 
+	{
+		
+	}
 }

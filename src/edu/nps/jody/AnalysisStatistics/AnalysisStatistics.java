@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.StringTokenizer;
 import java.util.TreeSet;
+import java.util.Vector;
 
 public class AnalysisStatistics 
 {
@@ -316,57 +317,119 @@ public class AnalysisStatistics
 		return data;
 	}
 	
-	public static void processFile(File file) throws FileNotFoundException, IOException
+	public static Statistics processFile(File file) throws FileNotFoundException, IOException
 	{
 		//File			file = null;
+		Statistics statistics;
 		String[] 	strings;
 		HashMap<Integer, Integer> authorMap;
 		int 			authorIndex = 0;
 		int			authorID;
 		int[][] 	confusionArray;
-		double 	mle;
+/*		double 	mle;
 		double accuracy;
 		double 	recall;
 		double 	precision;
-		double 	fScore;
+		double 	fScore;*/
 		
-		strings 					= loadStrings(file);
-		authorMap 			= makeAuthorMap(strings[AUTHOR_INDEX]);
-		confusionArray 	= loadConfusionArray(strings[CONFUSION_LINE_INDEX], authorMap);
-		accuracy				= getAccuracy(confusionArray, strings[TOTAL_INDEX]);
-		mle							= getMLE(strings[TRUTH_INDEX],strings[TOTAL_INDEX]);
+		strings 							= loadStrings(file);
+		authorMap 					= makeAuthorMap(strings[AUTHOR_INDEX]);
+		statistics						= new Statistics(authorMap.size());
+		statistics.authorMap	= authorMap;
+		confusionArray 			= loadConfusionArray(strings[CONFUSION_LINE_INDEX], authorMap);
+		statistics.accuracy		= getAccuracy(confusionArray, strings[TOTAL_INDEX]);
+		statistics.mle				= getMLE(strings[TRUTH_INDEX],strings[TOTAL_INDEX]);
 
 
 		
-		System.out.println(
+		/*System.out.println(
 				"MLE: " 			+ mle 				+ "\n"	+
-				"Accuracy: "	+ accuracy	+ "\n");
+				"Accuracy: "	+ accuracy	+ "\n");*/
 				
 		SortedSet<Integer> authorSet = new TreeSet<Integer>(authorMap.keySet());
 		Iterator<Integer> iterator = authorSet.iterator();
+		
+/*		statistics.recall = new double[authorMap.size()];
+		statistics.precision = new double[authorMap.size()];
+		statistics.fScore = new double[authorMap.size()];*/
 		
 		while (iterator.hasNext())
 		{
 			authorID = iterator.next();
 			authorIndex =authorMap.get(authorID);
 			
-			recall						= getRecall(confusionArray, authorIndex);
-			precision				= getPrecision(confusionArray, authorIndex);
-			fScore 					= getFscore(confusionArray, authorIndex);
+			statistics.recall[authorIndex]	= getRecall(confusionArray, authorIndex);
+			statistics.precision[authorIndex]				= getPrecision(confusionArray, authorIndex);
+			statistics.fScore[authorIndex] 					= getFscore(confusionArray, authorIndex);
 			
-			System.out.println();
+			/*System.out.println();
 			System.out.println(
 					"Author:\t"			+ authorID		+ "\n" +
 					"Recall:\t" 			+ recall 			+ "\n"	+
 					"Precision:\t" 	+ precision 	+ "\n"	+
-					"F-Score:\t" 		+ fScore);
+					"F-Score:\t" 		+ fScore);*/
 		}
+		
+		return statistics;
 	}
 	
-	public static void processFiles(File[] fileArray)
+	public static Statistics[] processFiles(File[] fileArray) throws FileNotFoundException, IOException
 	{
+		Statistics[] stats = new Statistics[fileArray.length];
+		for (int i=0; i < fileArray.length; i++)
+		{
+			stats[i] = processFile(fileArray[i]);
+		}
+		
+		return stats;
+	}
+	
+	public static Vector<File> getFiles (File topDirectory, String targetName, Vector<File> fileVector)
+	{
+		if (fileVector == null)
+		{
+			fileVector = new Vector<File>();
+		}
+		
+		File[] fileArray;
+		
+		if (topDirectory.getName().equalsIgnoreCase(targetName))
+		{
+			fileArray = new File[1];
+			fileArray[0] = topDirectory;
+		}
+		else
+		{
+			fileArray =topDirectory.listFiles();
+		}
+		
+		File[] targetArray;
+		
+		for (int i = 0; i < fileArray.length; i++)
+		{
+			if (fileArray[i].isDirectory())
+			{
+				if (fileArray[i].getName().equalsIgnoreCase(targetName))
+				{
+					targetArray = fileArray[i].listFiles();
+					for (int j = 0; j < targetArray.length; j++)
+					{
+						fileVector.add(targetArray[j]);
+					}
+				}
+				else
+				{
+					fileVector = getFiles(fileArray[i], targetName, fileVector);
+				}
+			}
+					
+		}
+		
+		return fileVector;
 		
 	}
+	
+	
 	
 	/**
 	 * @param args
@@ -375,6 +438,48 @@ public class AnalysisStatistics
 	 */
 	public static void main(String[] args) throws FileNotFoundException, IOException 
 	{
+		Vector<File> 	fileVector		 = new Vector<File>();
+		String 					targetName = "";
+		File 						topDirectory = new File(System.getProperty("user.dir"));
+		File[]					fileArray;
+		Statistics[]			stats;
 		
+		for (int i = 0; i < args.length; i++)
+		{
+			if(args[i].equalsIgnoreCase("--targetName"))
+			{
+				targetName = args[i+1];
+				i++;
+			}
+			else if (args[i].equalsIgnoreCase("--topDirectory"))
+			{
+				topDirectory = new File(args[i+1]);
+				i++;
+			}
+			
+		}
+		
+		fileVector = getFiles(topDirectory, targetName, fileVector);
+		
+		System.out.println("Size: " + fileVector.size());
+		
+		Iterator<File> iterator = fileVector.iterator();
+		
+		while (iterator.hasNext())
+		{
+			System.out.println(iterator.next().getName());
+		}
+		
+		fileArray = new File[fileVector.size()];
+		
+		//fileArray = (File[])fileVector.toArray();
+		fileVector.toArray(fileArray);
+		
+		for (int i = 0; i < fileArray.length; i++)
+		{
+			System.out.println(fileArray[i]);
+		}
+		
+		stats = processFiles(fileArray);
 	}
 }

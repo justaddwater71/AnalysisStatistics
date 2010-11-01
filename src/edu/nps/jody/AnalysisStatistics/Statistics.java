@@ -1,5 +1,6 @@
 package edu.nps.jody.AnalysisStatistics;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 public class Statistics 
@@ -14,9 +15,9 @@ public class Statistics
 	public HashMap<Integer, Integer> authorMap;
 	public double 	mle;
 	public double 	accuracy;
-	public double[] 	recall;
-	public double[] 	precision;
-	public double[] 	fScore;
+	public ArrayList<Double> recall;
+	public ArrayList<Double> precision;
+	public ArrayList<Double> fScore;
 	
 	//Constructors
 	public Statistics()
@@ -26,9 +27,9 @@ public class Statistics
 	
 	public Statistics(int authorCount)
 	{
-		recall = new double[authorCount];
-		precision = new double[authorCount];
-		fScore = new double[authorCount];
+		recall 			= new ArrayList(authorCount);
+		precision 	= new ArrayList(authorCount);
+		fScore 		= new ArrayList(authorCount);
 	}
 	
 	//Methods

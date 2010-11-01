@@ -1,5 +1,6 @@
 package edu.nps.jody.AnalysisStatistics;
 
+import java.util.ArrayList;
 import java.util.Vector;
 
 public class GroupStatistics 
@@ -32,15 +33,15 @@ public class GroupStatistics
 	public double		variationRecall;
 	public double		variationAccuracy;
 	
-	Statistics[]				stats;
-	double[]				fScores;
-	double[]				precisions;
-	double[]				recalls;
-	double[]				accuracies;
+	public ArrayList <Statistics>			stats;
+	public ArrayList <Double>				fScores;
+	public ArrayList<Double>				precisions;
+	public ArrayList<Double>				recalls;
+	public ArrayList<Double>				accuracies;
 	
 	//Constructors
 	public GroupStatistics( String corpus, String feature,  String model, 
-			String groupType, int groupSize, int crossVal, Statistics[] stats)
+			String groupType, int groupSize, int crossVal, ArrayList<Statistics> stats)
 	{
 		this.corpus = corpus;
 		this.feature = feature;
@@ -49,29 +50,33 @@ public class GroupStatistics
 		this.groupSize = groupSize;
 		this.crossVal = crossVal;
 		
-		this.stats = checkStats(stats);
+		checkStats(stats);
 	}
 	
 	//Methods
-	public void checkStats(Statistics[] rawStats)
+	public void checkStats(ArrayList<Statistics> rawStats)
 	{
 		Vector<Statistics> statsVector 	= new Vector<Statistics>();
 		Vector<Double> fScoreVector 		= new Vector<Double>();
 		Vector<Double> precisionVector	= new Vector<Double>();
 		Vector<Double> recallVector 		= new Vector<Double>();
 		Vector<Double> accuracyVector	= new Vector<Double>();
-		Statistics[] checkedStats;
 		
-		for (int i=0; i < rawStats.length; i++)
+		
+		for (int i=0; i < rawStats.size(); i++)
 		{
-			if (rawStats[i].corpus.equalsIgnoreCase(this.corpus) 					&&
-					rawStats[i].feature.equalsIgnoreCase(this.feature)				&&
-					rawStats[i].model.equalsIgnoreCase(this.model)					&&
-					rawStats[i].groupType.equalsIgnoreCase(this.groupType) 	&&
-					rawStats[i].groupSize == this.groupSize									&&
-					rawStats[i].crossVal == this.crossVal)
+			if (rawStats.get(i).corpus.equalsIgnoreCase(this.corpus) 					&&
+					rawStats.get(i).feature.equalsIgnoreCase(this.feature)					&&
+					rawStats.get(i).model.equalsIgnoreCase(this.model)						&&
+					rawStats.get(i).groupType.equalsIgnoreCase(this.groupType) 	&&
+					rawStats.get(i).groupSize == this.groupSize									&&
+					rawStats.get(i).crossVal == this.crossVal)
 					{
-						statsVector.add(rawStats[i]);
+						statsVector.add(rawStats.get(i));
+						fScoreVector.addAll(Collections.(rawStats.get(i).fScore))
+						precisionVector.add(rawStats[i].precision);
+						recallVector.add(rawStats[i].recall);
+						accuracyVector.add(rawStats[i].accuracy);
 					}
 		}
 		

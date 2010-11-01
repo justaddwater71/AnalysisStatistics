@@ -358,7 +358,7 @@ public class AnalysisStatistics
 			authorID = iterator.next();
 			authorIndex =authorMap.get(authorID);
 			
-			statistics.recall[authorIndex]	= getRecall(confusionArray, authorIndex);
+			statistics.recall[authorIndex]					= getRecall(confusionArray, authorIndex);
 			statistics.precision[authorIndex]				= getPrecision(confusionArray, authorIndex);
 			statistics.fScore[authorIndex] 					= getFscore(confusionArray, authorIndex);
 			
@@ -431,6 +431,7 @@ public class AnalysisStatistics
 	
 	
 	
+	
 	/**
 	 * @param args
 	 * @throws IOException 
@@ -481,5 +482,7 @@ public class AnalysisStatistics
 		}
 		
 		stats = processFiles(fileArray);
+		
+		
 	}
 }

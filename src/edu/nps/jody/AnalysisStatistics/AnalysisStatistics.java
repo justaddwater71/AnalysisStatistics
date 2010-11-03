@@ -5,6 +5,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.SortedSet;
@@ -14,18 +17,51 @@ import java.util.Vector;
 
 public class AnalysisStatistics 
 {
-	
 	//Data Members
-	public static final String AUTHOR_TAG 					= "<authors>";
+	/*public static final String AUTHOR_TAG 					= "<authors>";
 	public static final String CONFUSION_LINE_TAG	 	= "<confusionMatrix>";
 	public static final String TRUTH_TAG 						= "<truthUtterances>";
 	public static final String TOTAL_TAG 						= "<totalUtteranes>";
+	public static final String SIZE_TAG 							= "<originalDataSize>";
+	public static final String PATH_TAG							= "<mergeFileNameAndPath>";
+	public static final String FILE_TAG 							= "<mergeFileName>";
 	
+	//FIXME, the indices are all jacked up and need serious cleanup
 	public static final int AUTHOR_INDEX						= 0;
 	public static final int CONFUSION_LINE_INDEX		= 1;
 	public static final int TRUTH_INDEX							= 2;
-	public static final int TOTAL_INDEX							= 3;
-	public static final int LINE_MAX									= 4;
+	public static final int TOTAL_INDEX							= 8;
+	public static final int SIZE_INDEX 							= 7;
+	public static final int CROSSVAL_INDEX 					= 5;
+	public static final int GROUP_SIZE_INDEX 				= 4;
+	public static final int GROUP_TYPE_INDEX				= 3;
+	public static final int MODEL_INDEX 						= 2;
+	public static final int FEATURE_TYPE_INDEX			= 1;
+	public static final int CORPUS_INDEX						= 0;
+	public static final int FILE_INDEX 								= 9;
+	public static final int NAME_INDEX							= 6;
+	public static final int LINE_MAX									= 12;
+	
+	public static final int CORPUS 									= 0;
+	public static final int FEATURE_TYPE 						= 1;
+	public static final int MODEL 									= 2;
+	public static final int GROUP_TYPE							= 3;
+	public static final int GROUP_SIZE							= 4;
+	public static final int CROSSVAL 								= 5;
+	public static final int NAME 										= 6;
+	public static final int SIZE											= 7;
+	public static final int UTTERANCES 							= 8;
+	public static final int FILE											= 9;
+	
+	public static final int METHOD 									= 0;
+	public static final int ACCURACY 								= 1;
+	public static final int MLE 											= 2;
+	
+	public static final int RUN 											= 0;
+	public static final int AUTHOR 									= 1;
+	public static final int FSCORE 									= 2;
+	public static final int PRECISION								= 3;
+	public static final int RECALL 									= 4;*/
 	
 	//Constructors
 	
@@ -36,7 +72,7 @@ public class AnalysisStatistics
 		StringTokenizer stringTokenizer;
 		
 		//Just a check that we have the right line
-		if (line.startsWith(AUTHOR_TAG))
+		if (line.startsWith(FileValues.AUTHOR_MATRIX.columnLabel()))
 		{
 			stringTokenizer = new StringTokenizer(line);
 			
@@ -286,6 +322,13 @@ public class AnalysisStatistics
 		return accuracy;
 	}
 	
+	public static int getSize(String sizeString)
+	{
+		String[] stringArray = sizeString.split(" ");
+		
+		return Integer.parseInt(stringArray[1]);
+	}
+	
 	public static String[] loadStrings(File file) throws FileNotFoundException, IOException
 	{
 		String [] data = new String[LINE_MAX];
@@ -293,6 +336,10 @@ public class AnalysisStatistics
 		BufferedReader reader = new BufferedReader ( new FileReader (file));
 		
 		String line;
+		
+		String[] pathLine;
+		
+		data[NAME_INDEX] = null;
 		
 		while ((line = reader.readLine()) != null)
 		{
@@ -312,12 +359,44 @@ public class AnalysisStatistics
 			{
 				data[TOTAL_INDEX] = line;
 			}
+			else if (line.startsWith(SIZE_TAG))
+			{
+				data[SIZE_INDEX] = line;
+			}
+			else if (line.startsWith(PATH_TAG))
+			{
+				pathLine = processPathLine(line);
+				
+				data[CROSSVAL_INDEX]			= pathLine[0];
+				data[GROUP_SIZE_INDEX] 		= pathLine[1];
+				data[GROUP_TYPE_INDEX] 		= pathLine[2];
+				data[MODEL_INDEX] 				= pathLine[3];
+				data[FEATURE_TYPE_INDEX] = pathLine[4];
+				data[CORPUS_INDEX]				= pathLine[5];
+			}
+			else if (line.startsWith(FILE_TAG))
+			{
+				data[FILE_INDEX] = line.split(" ")[1];
+			}
 		}
 		
 		return data;
 	}
 	
-	public static Statistics processFile(File file) throws FileNotFoundException, IOException
+	private static String[] processPathLine(String line) 
+	{
+		String[] split = line.split("/");
+		
+		String[] result = new String[6];
+		
+		for (int i=0; i < 6; i++)
+		{
+			result[i] = split[ split.length - 3 - i];
+		}
+		return result;
+	}
+
+	public static Statistics processFile(File file, String method) throws FileNotFoundException, IOException
 	{
 		//File			file = null;
 		Statistics statistics;
@@ -326,11 +405,11 @@ public class AnalysisStatistics
 		int 			authorIndex = 0;
 		int			authorID;
 		int[][] 	confusionArray;
-/*		double 	mle;
-		double accuracy;
+		int 			utterances;
+		String 		filename;
 		double 	recall;
 		double 	precision;
-		double 	fScore;*/
+		double 	fScore;
 		
 		strings 							= loadStrings(file);
 		authorMap 					= makeAuthorMap(strings[AUTHOR_INDEX]);
@@ -339,46 +418,46 @@ public class AnalysisStatistics
 		confusionArray 			= loadConfusionArray(strings[CONFUSION_LINE_INDEX], authorMap);
 		statistics.accuracy		= getAccuracy(confusionArray, strings[TOTAL_INDEX]);
 		statistics.mle				= getMLE(strings[TRUTH_INDEX],strings[TOTAL_INDEX]);
-
-
-		
-		/*System.out.println(
-				"MLE: " 			+ mle 				+ "\n"	+
-				"Accuracy: "	+ accuracy	+ "\n");*/
+		statistics.size				= getSize(strings[SIZE_INDEX]);
+		statistics.utterances	= findTotalUtterances(strings[TOTAL_INDEX]);
+		statistics.corpus			= strings[CORPUS_INDEX];
+		statistics.feature			= strings[FEATURE_TYPE_INDEX];
+		statistics.model			= strings[MODEL_INDEX];
+		statistics.groupType	= strings[GROUP_TYPE_INDEX];
+		statistics.groupSize		= Integer.parseInt(strings[GROUP_SIZE_INDEX]);
+		statistics.crossVal		= Integer.parseInt(strings[CROSSVAL_INDEX]);
+		statistics.method			= method;
+		statistics.filename		= strings[FILE_INDEX];
 				
 		SortedSet<Integer> authorSet = new TreeSet<Integer>(authorMap.keySet());
 		Iterator<Integer> iterator = authorSet.iterator();
 		
-/*		statistics.recall = new double[authorMap.size()];
-		statistics.precision = new double[authorMap.size()];
-		statistics.fScore = new double[authorMap.size()];*/
 		
 		while (iterator.hasNext())
 		{
 			authorID = iterator.next();
 			authorIndex =authorMap.get(authorID);
 			
-			statistics.recall.set(authorIndex, getRecall(confusionArray, authorIndex))	;
-			statistics.precision.set(authorIndex,  getPrecision(confusionArray, authorIndex));
-			statistics.fScore.set(authorIndex, getFscore(confusionArray, authorIndex));
+			recall = getRecall(confusionArray, authorIndex);
+			precision = getPrecision(confusionArray, authorIndex);
+			fScore = getFscore(confusionArray, authorIndex);
 			
-			/*System.out.println();
-			System.out.println(
-					"Author:\t"			+ authorID		+ "\n" +
-					"Recall:\t" 			+ recall 			+ "\n"	+
-					"Precision:\t" 	+ precision 	+ "\n"	+
-					"F-Score:\t" 		+ fScore);*/
+			
+			statistics.recall.add(authorIndex, recall);
+			statistics.precision.add(authorIndex,  precision);
+			statistics.fScore.add(authorIndex, fScore);
+			
 		}
 		
 		return statistics;
 	}
 	
-	public static Statistics[] processFiles(File[] fileArray) throws FileNotFoundException, IOException
+	public static Statistics[] processFiles(File[] fileArray, String method) throws FileNotFoundException, IOException
 	{
 		Statistics[] stats = new Statistics[fileArray.length];
 		for (int i=0; i < fileArray.length; i++)
 		{
-			stats[i] = processFile(fileArray[i]);
+			stats[i] = processFile(fileArray[i], method);
 		}
 		
 		return stats;
@@ -429,21 +508,21 @@ public class AnalysisStatistics
 		
 	}
 	
-	
-	
-	
 	/**
 	 * @param args
 	 * @throws IOException 
 	 * @throws FileNotFoundException 
+	 * @throws SQLException 
+	 * @throws ClassNotFoundException 
 	 */
-	public static void main(String[] args) throws FileNotFoundException, IOException 
+	public static void main(String[] args) throws FileNotFoundException, IOException, ClassNotFoundException, SQLException 
 	{
 		Vector<File> 	fileVector		 = new Vector<File>();
 		String 					targetName = "";
 		File 						topDirectory = new File(System.getProperty("user.dir"));
 		File[]					fileArray;
 		Statistics[]			stats;
+		String					method = "libLinear";
 		
 		for (int i = 0; i < args.length; i++)
 		{
@@ -457,7 +536,11 @@ public class AnalysisStatistics
 				topDirectory = new File(args[i+1]);
 				i++;
 			}
-			
+			else if (args[i].equals("--method"))
+			{
+				method = args[i+1];
+				i++;
+			}
 		}
 		
 		fileVector = getFiles(topDirectory, targetName, fileVector);
@@ -481,6 +564,58 @@ public class AnalysisStatistics
 			System.out.println(fileArray[i]);
 		}
 		
-		stats = processFiles(fileArray);
+		stats = processFiles(fileArray, method);
+		
+		Connection connection = DatabaseConnector.connectToDatabase("jhgrady", "", "localhost", "thesis_stats");
+		
+		String [] fileFields	= {"corpus", "feature_type", "model", "group_type", "group_size", "crossval", "name", "size", "utterances", "file"};
+		String [] fileData	= new String[fileFields.length];
+		
+		String[] runFields = {"file", "method", "accuracy", "mle"};
+		String [] runData = new String[runFields.length];
+		
+		String[] resultFields ={"run", "author", "fscore", "precision", "recall"};
+		String[] resultData  = new String[resultFields.length];
+		
+		Iterator<Integer> authorIterator;
+		
+		Integer localAuthor;
+		Integer localFile;
+		Integer localRun;
+		
+		for (int i = 0; i < stats.length; i++)
+		{
+			fileData[CORPUS]					= "'" + stats[i].corpus +"'";
+			fileData[FEATURE_TYPE]		= "'" + stats[i].feature +"'";
+			fileData[MODEL]					= "'" + stats[i].model +"'";
+			fileData[GROUP_TYPE]		= "'" + stats[i].groupType +"'";
+			fileData[GROUP_SIZE]			="'" +  Integer.toString(stats[i].groupSize) +"'";
+			fileData[CROSSVAL]				="'" +  Integer.toString(stats[i].crossVal) +"'";
+			fileData[NAME]						= "'" + stats[i].filename +"'";
+			fileData[SIZE]						= "'" + Integer.toString(stats[i].size) +"'";
+			fileData[UTTERANCES]		= "'" + Integer.toString(stats[i].utterances) +"'";
+			
+			localFile = DatabaseConnector.addRecord(connection, "files", fileFields, fileData);
+			
+			runData[FILE]						= localFile.toString();
+			runData[METHOD]				= stats[i].method;
+			runData[ACCURACY]			= Double.toString(stats[i].accuracy);
+			runData[MLE]						= Double.toString(stats[i].mle);
+			
+			localRun = DatabaseConnector.addRecord(connection, "runs", runFields, runData);
+			
+			authorIterator = stats[i].authorMap.values().iterator();
+			
+			while (authorIterator.hasNext())
+			{
+				localAuthor = authorIterator.next();
+				
+				resultData[RUN]					= localRun.toString();
+				resultData[AUTHOR]			= localAuthor.toString();
+				resultData[FSCORE]				= stats[i].fScore.get(localAuthor).toString();
+				resultData[PRECISION]		= stats[i].precision.get(localAuthor).toString();
+				resultData[RECALL]				= stats[i].recall.get(localAuthor).toString();
+			}
+		}
 	}
 }

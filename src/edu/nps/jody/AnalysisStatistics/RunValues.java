@@ -25,4 +25,54 @@ public enum RunValues
 	{
 		return tagLine;
 	}
+	
+	public static int getTagSize()
+	{
+		RunValues[] runValues = RunValues.values();
+		
+		int count = 0;
+		
+		for (int i = 0; i < runValues.length; i++)
+		{
+			if ( ! runValues[i].tagLine().equalsIgnoreCase(null))
+			{
+				count++;
+			}
+		}
+		return count;
+	}
+	
+	public static int getColumnLabelSize()
+	{
+		RunValues[] runValues = RunValues.values();
+		
+		int count = 0;
+		
+		for (int i = 0; i < runValues.length; i++)
+		{
+			if ( ! runValues[i].columnLabel().equalsIgnoreCase(null))
+			{
+				count++;
+			}
+		}
+		return count;
+	}
+	
+	public static String[] getColumnLabels()
+	{
+		RunValues[] runValues	= RunValues.values();
+		int columnLabelSize	= getColumnLabelSize();
+		String[] run				= new String[columnLabelSize];
+		int index 						= 0;
+		
+		for (int i = 0; i < runValues.length; i++)
+		{
+			if ( ! runValues[i].columnLabel.equalsIgnoreCase(null))
+			{
+				run[index] = runValues[i].columnLabel;
+				index++;
+			}
+		}
+		return run;
+	}
 }

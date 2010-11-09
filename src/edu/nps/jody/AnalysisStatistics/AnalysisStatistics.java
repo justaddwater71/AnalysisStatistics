@@ -72,7 +72,7 @@ public class AnalysisStatistics
 		StringTokenizer stringTokenizer;
 		
 		//Just a check that we have the right line
-		if (line.startsWith(FileValues.AUTHOR_MATRIX.columnLabel()))
+		if (line.startsWith(FileValues.AUTHOR_MATRIX.tagLine()))
 		{
 			stringTokenizer = new StringTokenizer(line);
 			
@@ -100,7 +100,7 @@ public class AnalysisStatistics
 		Integer authorIndex = 0;
 		
 			//Discard the author tag
-		if (stringTokenizer.nextToken().equalsIgnoreCase(AUTHOR_TAG))
+		if (stringTokenizer.nextToken().equalsIgnoreCase(FileValues.AUTHOR_MATRIX.tagLine()))
 		{
 			
 			//The authors are string sorted in the file.  This codes gets them in integer order
@@ -148,7 +148,7 @@ public class AnalysisStatistics
 		int count;
 		
 		//Dummy check that this is the right line
-		if (lineTokenizer.nextToken().equalsIgnoreCase(CONFUSION_LINE_TAG))
+		if (lineTokenizer.nextToken().equalsIgnoreCase(FileValues.CONFUSION_MATRIX.tagLine()))
 		{
 			//Initialize confusionArray
 			for (int i = 0; i < authorMap.size(); i++)
@@ -194,7 +194,7 @@ public class AnalysisStatistics
 		StringTokenizer truthLineTokenizer = new StringTokenizer(truthLine);
 		
 		//Dummy check that this is the correct line to be reading
-		if (truthLineTokenizer.nextToken().equalsIgnoreCase(TRUTH_TAG))
+		if (truthLineTokenizer.nextToken().equalsIgnoreCase(FileValues.TRUTH_MATRIX.tagLine()))
 		{
 			while (truthLineTokenizer.hasMoreTokens())
 			{
@@ -219,7 +219,7 @@ public class AnalysisStatistics
 		StringTokenizer tokenizer = new StringTokenizer(totalLine);
 		
 		//Dummy check that this is the right line
-		if (tokenizer.nextToken().equalsIgnoreCase(TOTAL_TAG) && tokenizer.hasMoreTokens())
+		if (tokenizer.nextToken().equalsIgnoreCase(FileValues.UTTERANCES.tagLine()) && tokenizer.hasMoreTokens())
 		{
 			//total = Integer.parseInt(tokenizer.nextToken());
 			total = Integer.parseInt(tokenizer.nextToken());
@@ -331,7 +331,8 @@ public class AnalysisStatistics
 	
 	public static String[] loadStrings(File file) throws FileNotFoundException, IOException
 	{
-		String [] data = new String[LINE_MAX];
+		//String [] data = new String[LINE_MAX];
+		String [] data = new String[FileValues.getSize()];
 		
 		BufferedReader reader = new BufferedReader ( new FileReader (file));
 		
@@ -339,11 +340,39 @@ public class AnalysisStatistics
 		
 		String[] pathLine;
 		
-		data[NAME_INDEX] = null;
+		//data[NAME_INDEX] = null;
+		
+		FileValues[] fileValues = FileValues.values();
 		
 		while ((line = reader.readLine()) != null)
 		{
-			if (line.startsWith(AUTHOR_TAG))
+			 if (line.startsWith(FileValues.PATH.tagLine()))
+				{
+				 	data[FileValues.PATH.ordinal()] = line.split(" ")[1];
+				 
+					pathLine = processPathLine(line);
+					
+					data[FileValues.CORPUS.ordinal()]				= pathLine[0];
+					data[FileValues.GROUP_SIZE.ordinal()] 		= pathLine[1];
+					data[FileValues.GROUP_TYPE.ordinal()] 		= pathLine[2];
+					data[FileValues.MODEL.ordinal()] 				= pathLine[3];
+					data[FileValues.FEATURE_TYPE.ordinal()] 	= pathLine[4];
+					data[FileValues.CORPUS.ordinal()]				= pathLine[5];
+				}
+			 else
+			 {
+				for (int i=0;i<FileValues.getTagSize(); i++)
+				{
+					if (line.startsWith(fileValues[i].tagLine()))
+					{
+						data[fileValues[i].ordinal()] = line.split(" ")[1];
+						i++;
+						break;
+					}
+				}
+			 }
+			
+		/*	if (line.startsWith(AUTHOR_TAG))
 			{
 				data[AUTHOR_INDEX] = line;
 			}
@@ -362,22 +391,12 @@ public class AnalysisStatistics
 			else if (line.startsWith(SIZE_TAG))
 			{
 				data[SIZE_INDEX] = line;
-			}
-			else if (line.startsWith(PATH_TAG))
+			}*/
+			//else
+			/*else if (line.startsWith(FILE_TAG))
 			{
-				pathLine = processPathLine(line);
-				
-				data[CROSSVAL_INDEX]			= pathLine[0];
-				data[GROUP_SIZE_INDEX] 		= pathLine[1];
-				data[GROUP_TYPE_INDEX] 		= pathLine[2];
-				data[MODEL_INDEX] 				= pathLine[3];
-				data[FEATURE_TYPE_INDEX] = pathLine[4];
-				data[CORPUS_INDEX]				= pathLine[5];
-			}
-			else if (line.startsWith(FILE_TAG))
-			{
-				data[FILE_INDEX] = line.split(" ")[1];
-			}
+				data[FILE_INDEX] =line; // line.split(" ")[1];
+			}*/
 		}
 		
 		return data;
@@ -396,6 +415,74 @@ public class AnalysisStatistics
 		return result;
 	}
 
+	public static void processFile(File file, String method, Connection connection) throws FileNotFoundException, IOException, SQLException
+	{
+		String[] strings = loadStrings(file);
+		
+		String[] labels = FileValues.getColumnLabels();
+		String[] data = new String[ labels.length ];
+		FileValues[] fileValues = FileValues.values();
+		
+		//FIXME Put the guts of File Data here
+		for (int i=0; i < labels.length; i++)
+		{
+			if (! fileValues[i].columnLabel().isEmpty())
+			{
+				data[i] = strings[i];
+			}
+		}
+		
+		int fileNumber = DatabaseConnector.addRecord(connection, "files", labels, data);
+		
+		HashMap<Integer, Integer> authorMap = makeAuthorMap(strings[FileValues.CONFUSION_MATRIX.ordinal()]);
+		
+		int[][] confusionArray = loadConfusionArray(strings[FileValues.CONFUSION_MATRIX.ordinal()], authorMap);
+		
+		int runNumber	= processRunData(strings, method, connection, confusionArray, fileNumber, data[FileValues.UTTERANCES.ordinal()]);
+		
+		processResultData(strings, connection, confusionArray, authorMap, runNumber); 
+	}
+	
+	public static int processRunData(String[] strings, String method, Connection connection, int[][] confusionArray,int  fileNumber, String totalUtterances) throws SQLException
+	{
+		String[] labels = RunValues.getColumnLabels();
+		String[] data = new String[ labels.length ];
+		
+		data[RunValues.FILE.ordinal()] = Integer.toString(fileNumber);
+		data[RunValues.METHOD.ordinal()] = method;
+		data[RunValues.ACCURACY.ordinal()] = Double.toString(getAccuracy(confusionArray, totalUtterances));
+		
+		int runID = DatabaseConnector.addRecord(connection, "runs", labels, data);
+		
+		return runID;
+	}
+	
+	public static void processResultData(String[] strings, Connection connection, int[][] confusionArray, HashMap<Integer, Integer> authorMap, int runNumber) throws SQLException
+	{
+		String[] labels = ResultValues.getColumnLabels();
+		String[] data = new String[ labels.length ];
+		
+		//FIXME Put the guts of Result Data here
+		data[ResultValues.RUN.ordinal()] = Integer.toString(runNumber);
+		
+		Integer author;
+		
+		SortedSet<Integer> authorSet = new TreeSet<Integer>(authorMap.keySet());
+		
+		Iterator<Integer> iterator = authorSet.iterator();
+		
+		while (iterator.hasNext())
+		{
+			author = iterator.next();
+			data[ResultValues.AUTHOR.ordinal()] 		= author.toString();
+			data[ResultValues.FSCORE.ordinal()] 		= Double.toString(getFscore(confusionArray, author));
+			data[ResultValues.PRECISION.ordinal()] 	= Double.toString(getPrecision(confusionArray, author));
+			data[ResultValues.RECALL.ordinal()] 		= Double.toString(getRecall(confusionArray, author));
+			DatabaseConnector.addRecord(connection, "results", labels, data);
+		}
+		
+	}
+	
 	public static Statistics processFile(File file, String method) throws FileNotFoundException, IOException
 	{
 		//File			file = null;
@@ -412,22 +499,23 @@ public class AnalysisStatistics
 		double 	fScore;
 		
 		strings 							= loadStrings(file);
-		authorMap 					= makeAuthorMap(strings[AUTHOR_INDEX]);
+		authorMap 					= makeAuthorMap(strings[FileValues.AUTHOR_MATRIX.ordinal()]);
 		statistics						= new Statistics(authorMap.size());
 		statistics.authorMap	= authorMap;
-		confusionArray 			= loadConfusionArray(strings[CONFUSION_LINE_INDEX], authorMap);
-		statistics.accuracy		= getAccuracy(confusionArray, strings[TOTAL_INDEX]);
-		statistics.mle				= getMLE(strings[TRUTH_INDEX],strings[TOTAL_INDEX]);
-		statistics.size				= getSize(strings[SIZE_INDEX]);
-		statistics.utterances	= findTotalUtterances(strings[TOTAL_INDEX]);
-		statistics.corpus			= strings[CORPUS_INDEX];
-		statistics.feature			= strings[FEATURE_TYPE_INDEX];
-		statistics.model			= strings[MODEL_INDEX];
-		statistics.groupType	= strings[GROUP_TYPE_INDEX];
-		statistics.groupSize		= Integer.parseInt(strings[GROUP_SIZE_INDEX]);
-		statistics.crossVal		= Integer.parseInt(strings[CROSSVAL_INDEX]);
+		confusionArray 			= loadConfusionArray(strings[FileValues.CONFUSION_MATRIX.ordinal()], authorMap);
+		statistics.accuracy		= getAccuracy(confusionArray, strings[FileValues.UTTERANCES.ordinal()]);
+		statistics.mle				= getMLE(strings[FileValues.TRUTH_MATRIX.ordinal()],strings[FileValues.UTTERANCES.ordinal()]);
+		statistics.size				= getSize(strings[FileValues.FILESIZE.ordinal()]);
+		//statistics.utterances	= findTotalUtterances(strings[TOTAL_INDEX]);
+		statistics.utterances	= Integer.parseInt(strings[FileValues.UTTERANCES.ordinal()].split(" ")[1]);
+		statistics.corpus			= strings[FileValues.CORPUS.ordinal()];
+		statistics.feature			= strings[FileValues.FEATURE_TYPE.ordinal()];
+		statistics.model			= strings[FileValues.MODEL.ordinal()];
+		statistics.groupType	= strings[FileValues.GROUP_TYPE.ordinal()];
+		statistics.groupSize		= Integer.parseInt(strings[FileValues.GROUP_SIZE.ordinal()]);
+		statistics.crossVal		= Integer.parseInt(strings[FileValues.CROSSVAL.ordinal()]);
 		statistics.method			= method;
-		statistics.filename		= strings[FILE_INDEX];
+		statistics.filename		= strings[FileValues.FILENAME.ordinal()].split(" ")[1];
 				
 		SortedSet<Integer> authorSet = new TreeSet<Integer>(authorMap.keySet());
 		Iterator<Integer> iterator = authorSet.iterator();
@@ -507,6 +595,7 @@ public class AnalysisStatistics
 		return fileVector;
 		
 	}
+
 	
 	/**
 	 * @param args
@@ -568,13 +657,13 @@ public class AnalysisStatistics
 		
 		Connection connection = DatabaseConnector.connectToDatabase("jhgrady", "", "localhost", "thesis_stats");
 		
-		String [] fileFields	= {"corpus", "feature_type", "model", "group_type", "group_size", "crossval", "name", "size", "utterances", "file"};
+		String [] fileFields	= FileValues.getColumnLabels();//{"corpus", "feature_type", "model", "group_type", "group_size", "crossval", "name", "size", "utterances", "file"};
 		String [] fileData	= new String[fileFields.length];
 		
-		String[] runFields = {"file", "method", "accuracy", "mle"};
+		String[] runFields = RunValues.getColumnLabels();//{"file", "method", "accuracy", "mle"};
 		String [] runData = new String[runFields.length];
 		
-		String[] resultFields ={"run", "author", "fscore", "precision", "recall"};
+		String[] resultFields =ResultValues.getColumnLabels();//{"run", "author", "fscore", "precision", "recall"};
 		String[] resultData  = new String[resultFields.length];
 		
 		Iterator<Integer> authorIterator;
@@ -585,22 +674,22 @@ public class AnalysisStatistics
 		
 		for (int i = 0; i < stats.length; i++)
 		{
-			fileData[CORPUS]					= "'" + stats[i].corpus +"'";
-			fileData[FEATURE_TYPE]		= "'" + stats[i].feature +"'";
-			fileData[MODEL]					= "'" + stats[i].model +"'";
-			fileData[GROUP_TYPE]		= "'" + stats[i].groupType +"'";
-			fileData[GROUP_SIZE]			="'" +  Integer.toString(stats[i].groupSize) +"'";
-			fileData[CROSSVAL]				="'" +  Integer.toString(stats[i].crossVal) +"'";
-			fileData[NAME]						= "'" + stats[i].filename +"'";
-			fileData[SIZE]						= "'" + Integer.toString(stats[i].size) +"'";
-			fileData[UTTERANCES]		= "'" + Integer.toString(stats[i].utterances) +"'";
+			fileData[FileValues.CORPUS.ordinal()]							= "'" + stats[i].corpus +"'";
+			fileData[FileValues.FEATURE_TYPE.ordinal()]				= "'" + stats[i].feature +"'";
+			fileData[FileValues.MODEL.ordinal()]							= "'" + stats[i].model +"'";
+			fileData[FileValues.GROUP_TYPE.ordinal()]					= "'" + stats[i].groupType +"'";
+			fileData[FileValues.GROUP_SIZE.ordinal()]					="'" +  Integer.toString(stats[i].groupSize) +"'";
+			fileData[FileValues.CROSSVAL.ordinal()]						="'" +  Integer.toString(stats[i].crossVal) +"'";
+			fileData[FileValues.FILENAME.ordinal()]						= "'" + stats[i].filename +"'";
+			fileData[FileValues.FILESIZE.ordinal()]							= "'" + Integer.toString(stats[i].size) +"'";
+			fileData[FileValues.UTTERANCES.ordinal()]				= "'" + Integer.toString(stats[i].utterances) +"'";
 			
 			localFile = DatabaseConnector.addRecord(connection, "files", fileFields, fileData);
 			
-			runData[FILE]						= localFile.toString();
-			runData[METHOD]				= stats[i].method;
-			runData[ACCURACY]			= Double.toString(stats[i].accuracy);
-			runData[MLE]						= Double.toString(stats[i].mle);
+			runData[RunValues.FILE.ordinal()]							= localFile.toString();
+			runData[RunValues.METHOD.ordinal()]					= stats[i].method;
+			runData[RunValues.ACCURACY.ordinal()]				= Double.toString(stats[i].accuracy);
+			runData[RunValues.MLE.ordinal()]							= Double.toString(stats[i].mle);
 			
 			localRun = DatabaseConnector.addRecord(connection, "runs", runFields, runData);
 			
@@ -610,11 +699,11 @@ public class AnalysisStatistics
 			{
 				localAuthor = authorIterator.next();
 				
-				resultData[RUN]					= localRun.toString();
-				resultData[AUTHOR]			= localAuthor.toString();
-				resultData[FSCORE]				= stats[i].fScore.get(localAuthor).toString();
-				resultData[PRECISION]		= stats[i].precision.get(localAuthor).toString();
-				resultData[RECALL]				= stats[i].recall.get(localAuthor).toString();
+				resultData[ResultValues.RUN.ordinal()]					= localRun.toString();
+				resultData[ResultValues.AUTHOR.ordinal()]			= localAuthor.toString();
+				resultData[ResultValues.FSCORE.ordinal()]			= stats[i].fScore.get(localAuthor).toString();
+				resultData[ResultValues.PRECISION.ordinal()]		= stats[i].precision.get(localAuthor).toString();
+				resultData[ResultValues.RECALL.ordinal()]				= stats[i].recall.get(localAuthor).toString();
 			}
 		}
 	}

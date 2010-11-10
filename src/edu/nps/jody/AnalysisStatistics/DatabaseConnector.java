@@ -5,6 +5,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Properties;
 
 public class DatabaseConnector 
 {
@@ -22,7 +23,12 @@ public class DatabaseConnector
 	{
 		String url = "jdbc:mysql://" + servername + "/" + database;
 		Class.forName("com.mysql.jdbc.Driver");
-		Connection connection = DriverManager.getConnection(url, username, password);		
+		
+		Properties properties = new Properties();
+		properties.setProperty("user", username);
+		properties.setProperty("password", password);
+		properties.setProperty("jdbcCompliantTruncation","false");
+		Connection connection = DriverManager.getConnection(url, properties);		
 		
 		return connection;
 	}
@@ -109,12 +115,5 @@ public class DatabaseConnector
 		
 		Connection connection = connectToDatabase(username, password, servername, database);
 		
-		String[] fields 	= { "run", "author", "fscore", "this_precision", "recall"};
-		String[] data 		= {"'1'", "'1'", "'0.5'", "'0.5'", "'0.5'"};
-		//String autoGenIdColumnName = "result";
-		
-		int result = addRecord(connection, table, fields, data);
-		
-		System.out.println(result);
 	}
 }

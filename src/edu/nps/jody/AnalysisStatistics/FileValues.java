@@ -5,7 +5,7 @@ public enum FileValues
 	CORPUS							("corpus", 				"<corpus>"),
 	FEATURE_TYPE				("feature_type", 	"<featureType>"),
 	MODEL							("model", 				"<model>"),
-	METHOD							("method",			"<method>"),
+	METHOD							("method",				"<method>"),
 	GROUP_TYPE					("group_type", 		"<groupType>"),
 	GROUP_SIZE					("group_size", 		"<groupSize>"),
 	CROSSVAL						("crossval", 			"<crossval>"),
@@ -14,8 +14,8 @@ public enum FileValues
 	UTTERANCES				("utterances", 		"<totalUtterances>"),
 	CONFUSION_MATRIX		(null, 						"<confusionMatrix>"),
 	AUTHOR_MATRIX			(null,						"<authors>"),
-	TRUTH_MATRIX				(null, 						"<truthUtterances"),
-	PATH								(null,						"<mergeFileNameAndPath");
+	TRUTH_MATRIX				(null, 						"<truthUtterances>"),
+	PATH								(null,						"<mergeFileNameAndPath>");
 	
 	private String 		columnLabel;
 	private String 		tagLine;
@@ -67,9 +67,16 @@ public enum FileValues
 		
 		for (int i = 0; i < fileValues.length; i++)
 		{
-			if ( ! fileValues[i].columnLabel().equalsIgnoreCase(null))
+			try
 			{
-				count++;
+				if ( ! fileValues[i].columnLabel.isEmpty())
+				{
+					count++;
+				}
+			}
+			catch (NullPointerException n)
+			{
+				//Do nothing, this is expected for null columns in the Enumerator
 			}
 		}
 		return count;
@@ -84,10 +91,17 @@ public enum FileValues
 		
 		for (int i = 0; i < fileValues.length; i++)
 		{
-			if ( ! fileValues[i].columnLabel.equalsIgnoreCase(null))
+			try
 			{
-				result[index] = fileValues[i].columnLabel;
-				index++;
+				if (index < result.length)
+				{
+					result[index] = fileValues[i].columnLabel;
+					index++;
+				}
+			}
+			catch (NullPointerException n)
+			{
+				//Do nothing, null values will throw this and is expected.
 			}
 		}
 		return result;
